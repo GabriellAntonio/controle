@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanças Pro - Controle de Gastos e Receitas</title>
+    
+    <!-- Configurações exclusivas para o iPhone (Modo App Nativo PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FinançasPro">
+    <link rel="apple-touch-icon" href="https://placehold.co/180x180/4f46e5/ffffff?text=FPro">
+
+    <!-- Tailwind CSS para Estilização Premium -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome para Ícones Modernos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js para Gráficos Incríveis -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Custom scrollbar para visual limpo */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen pb-12">
+
+    <!-- Topbar / Header -->
+    <header class="sticky top-0 z-40 bg-white border-b border-slate-200/80 backdrop-blur-md bg-white/90">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-200">
+                    <i class="fa-solid fa-wallet text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 tracking-tight">Finanças Pro</h1>
+                    <p class="text-xs text-slate-500 font-medium">Controle de Gastos de Casal</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <!-- Seletor de Mês/Ano Global -->
+                <input type="month" id="globalPeriodFilter" class="bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-semibold text-sm rounded-xl px-3 py-2 border-none focus:ring-2 focus:ring-indigo-500 cursor-pointer transition-all duration-200">
+                
+                <!-- Menu de Ações Globais -->
+                <button onclick="openBackupMenu()" class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all duration-200" title="Backup e Exportação">
+                    <i class="fa-solid fa-cloud-arrow-down text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+
+        <!-- Grid de KPI Cards (Métricas Rápidas) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Saldo Atual -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+                <div class="relative flex items-center justify-between mb-3">
+                    <span class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Saldo Mensal</span>
+                    <span class="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><i class="fa-solid fa-scale-balanced"></i></span>
+                </div>
+                <div class="relative">
+                    <h3 id="kpiSaldo" class="text-2xl font-extrabold text-slate-900 tracking-tight">R$ 0,00</h3>
+                    <p class="text-xs text-slate-500 mt-1 flex items-center">
+                        <span id="kpiSaldoStatus" class="font-semibold text-emerald-600 flex items-center mr-1">
+                            <i class="fa-solid fa-circle-check mr-1"></i> Equilibrado
+                        </span>
+                        neste período
+                    </p>
+                </div>
+            </div>
+
+            <!-- Receitas -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+                <div class="relative flex items-center justify-between mb-3">
+                    <span class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Receitas</span>
+                    <span class="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><i class="fa-solid fa-circle-arrow-up"></i></span>
+                </div>
+                <div class="relative">
+                    <h3 id="kpiReceitas" class="text-2xl font-extrabold text-emerald-600 tracking-tight">R$ 0,00</h3>
+                    <p class="text-xs text-slate-500 mt-1">Soma de todas as entradas</p>
+                </div>
+            </div>
+
+            <!-- Despesas -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+                <div class="relative flex items-center justify-between mb-3">
+                    <span class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Despesas</span>
+                    <span class="p-2 bg-rose-50 text-rose-600 rounded-xl"><i class="fa-solid fa-circle-arrow-down"></i></span>
+                </div>
+                <div class="relative">
+                    <h3 id="kpiDespesas" class="text-2xl font-extrabold text-rose-600 tracking-tight">R$ 0,00</h3>
+                    <p class="text-xs text-slate-500 mt-1">Total de saídas registradas</p>
+                </div>
+            </div>
+
+            <!-- Economia -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-500"></div>
+                <div class="relative flex items-center justify-between mb-3">
+                    <span class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Taxa de Poupança</span>
+                    <span class="p-2 bg-amber-50 text-amber-600 rounded-xl"><i class="fa-solid fa-piggy-bank"></i></span>
+                </div>
+                <div class="relative">
+                    <h3 id="kpiEconomia" class="text-2xl font-extrabold text-slate-900 tracking-tight">0%</h3>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full mt-2.5 overflow-hidden">
+                        <div id="kpiEconomiaBar" class="bg-amber-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção Gráficos e Limites de Orçamento -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Gráficos -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-8 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-md font-bold text-slate-900">Visão Geral de Despesas</h2>
+                        <p class="text-xs text-slate-400">Distribuição proporcional por categoria neste mês</p>
+                    </div>
+                </div>
+                <div class="relative flex-1 min-h-[260px] flex items-center justify-center">
+                    <!-- Placeholder de Sem Dados -->
+                    <div id="chartPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 z-10">
+                        <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                            <i class="fa-solid fa-chart-pie text-xl"></i>
+                        </div>
+                        <h4 class="text-sm font-semibold text-slate-700">Nenhum gasto registrado</h4>
+                        <p class="text-xs text-slate-400 mt-1 max-w-xs">Adicione despesas neste mês para visualizar o gráfico de distribuição.</p>
+                    </div>
+                    <canvas id="expensesChart" class="max-h-[280px] w-full"></canvas>
+                </div>
+            </div>
+
+            <!-- Limites por Categoria (Orçamentos) -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-4 flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-md font-bold text-slate-900">Limites por Categoria</h2>
+                        <p class="text-xs text-slate-400 font-medium">Metas de gastos mensais</p>
+                    </div>
+                    <div class="flex space-x-1">
+                        <button onclick="openCategoryModal()" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 px-2 py-1.5 rounded-lg transition-all duration-150" title="Gerenciar Categorias">
+                            <i class="fa-solid fa-tags mr-1"></i>Categorias
+                        </button>
+                        <button onclick="openBudgetModal()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition-all duration-150">
+                            <i class="fa-solid fa-gear mr-1"></i>Limites
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Lista de Limites com Progresso -->
+                <div id="budgetProgressList" class="space-y-4 overflow-y-auto flex-1 max-h-[260px] pr-1 hide-scrollbar">
+                    <!-- Inserido dinamicamente via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Planilha / Tabela de Lançamentos -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <!-- Cabeçalho de Controle da Planilha -->
+            <div class="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+                    <!-- Barra de Pesquisa -->
+                    <div class="relative flex-1 max-w-md">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                            <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                        </span>
+                        <input type="text" id="tableSearch" placeholder="Pesquisar por descrição..." class="w-full bg-white border border-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all duration-200">
+                    </div>
+                    <!-- Filtro Tipo de Lançamento -->
+                    <select id="filterType" class="bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none cursor-pointer transition-all duration-200">
+                        <option value="all">Todos os tipos</option>
+                        <option value="receita">Apenas Receitas</option>
+                        <option value="despesa">Apenas Despesas</option>
+                    </select>
+                </div>
+                
+                <!-- Botões de Adicionar -->
+                <div class="flex items-center space-x-2">
+                    <button onclick="openTransactionModal('receita')" class="flex-1 sm:flex-initial flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl px-4 py-2.5 shadow-sm shadow-emerald-100 active:scale-95 transition-all duration-150">
+                        <i class="fa-solid fa-plus mr-2"></i>+ Receita
+                    </button>
+                    <button onclick="openTransactionModal('despesa')" class="flex-1 sm:flex-initial flex items-center justify-center bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm rounded-xl px-4 py-2.5 shadow-sm shadow-rose-100 active:scale-95 transition-all duration-150">
+                        <i class="fa-solid fa-minus mr-2"></i>- Despesa
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabela Principal -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                            <th class="py-3 px-5">Data</th>
+                            <th class="py-3 px-5">Descrição</th>
+                            <th class="py-3 px-5">Categoria</th>
+                            <th class="py-3 px-5 text-center">Status</th>
+                            <th class="py-3 px-5 text-right">Valor</th>
+                            <th class="py-3 px-5 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionTableBody" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
+                        <!-- Inserido dinamicamente via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Rodapé da Planilha / Sem Dados -->
+            <div id="tableEmptyState" class="hidden flex-col items-center justify-center text-center py-16 px-4 bg-slate-50/50">
+                <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3.5">
+                    <i class="fa-solid fa-folder-open text-2xl"></i>
+                </div>
+                <h3 class="text-sm font-bold text-slate-800">Nenhum lançamento encontrado</h3>
+                <p class="text-xs text-slate-400 mt-1 max-w-xs">Use os botões acima para cadastrar a primeira receita ou despesa de vocês neste mês.</p>
+            </div>
+            
+            <div id="tableFooter" class="px-5 py-4 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between text-xs text-slate-500">
+                <span id="tableSummaryText">Mostrando 0 lançamentos</span>
+                <span id="tableSelectedMonthText" class="font-semibold text-indigo-600">Mês Selecionado</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL 1: Formulário de Transação (Adicionar / Editar) -->
+    <div id="modalTransaction" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="modalTransactionContent">
+            <!-- Header do Modal -->
+            <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100" id="modalTransactionHeader">
+                <h3 class="text-base font-bold text-slate-900" id="modalTransactionTitle">Nova Transação</h3>
+                <button onclick="closeTransactionModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all duration-150">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- Corpo do Formulário -->
+            <form id="formTransaction" onsubmit="saveTransaction(event)" class="p-5 space-y-4">
+                <input type="hidden" id="txId">
+                <input type="hidden" id="txType">
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Descrição</label>
+                    <input type="text" id="txDesc" required placeholder="Ex: Mercado do Mês, Salário Esposa" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition-all duration-200">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Valor (R$)</label>
+                        <input type="number" step="0.01" min="0.01" id="txValue" required placeholder="0,00" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition-all duration-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Data</label>
+                        <input type="date" id="txDate" required class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition-all duration-200">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Categoria</label>
+                        <select id="txCategory" required class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none cursor-pointer transition-all duration-200">
+                            <!-- Inserido dinamicamente baseado no tipo -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Status</label>
+                        <select id="txStatus" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none cursor-pointer transition-all duration-200">
+                            <option value="Pago">Pago/Recebido</option>
+                            <option value="Pendente">Pendente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end space-x-2">
+                    <button type="button" onclick="closeTransactionModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 text-sm font-semibold transition-all duration-150">Cancelar</button>
+                    <button type="submit" id="btnSaveTx" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-all duration-150">Salvar Transação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Configurar Limites (Orçamentos) -->
+    <div id="modalBudget" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="modalBudgetContent">
+            <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">Definir Limites de Gastos</h3>
+                <button onclick="closeBudgetModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all duration-150">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="formBudget" onsubmit="saveBudgets(event)" class="p-5 flex flex-col justify-between max-h-[75vh]">
+                <p class="text-xs text-slate-400 mb-4">Estipule o teto máximo de gastos mensais para cada categoria de despesa cadastrada.</p>
+                <div id="budgetInputsContainer" class="space-y-3.5 overflow-y-auto pr-1 flex-1 max-h-[40vh] hide-scrollbar">
+                    <!-- Gerado dinamicamente via JS (com step="0.01" para permitir R$ 973,00) -->
+                </div>
+                <div class="pt-4 mt-4 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" onclick="closeBudgetModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 text-sm font-semibold transition-all duration-150">Cancelar</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-all duration-150">Salvar Limites</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Gerenciamento de Categorias -->
+    <div id="modalCategory" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="modalCategoryContent">
+            <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">Gerenciar Categorias</h3>
+                <button onclick="closeCategoryModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all duration-150">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <!-- Adicionar Nova Categoria -->
+                <form id="formNewCategory" onsubmit="addCategory(event)" class="space-y-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Criar Nova Categoria</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="newCatName" required placeholder="Nome: Ex: Pet" class="w-full bg-white border border-slate-200 text-sm rounded-lg px-2.5 py-2 focus:border-indigo-500 outline-none">
+                        <select id="newCatType" class="w-full bg-white border border-slate-200 text-sm rounded-lg px-2 py-2 focus:border-indigo-500 outline-none cursor-pointer">
+                            <option value="despesa">Despesa</option>
+                            <option value="receita">Receita</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="newCatColor" class="w-full bg-white border border-slate-200 text-sm rounded-lg px-2 py-2 focus:border-indigo-500 outline-none cursor-pointer">
+                            <option value="#f43f5e">Vermelho</option>
+                            <option value="#3b82f6">Azul</option>
+                            <option value="#10b981">Verde</option>
+                            <option value="#f59e0b">Laranja</option>
+                            <option value="#8b5cf6">Roxo</option>
+                            <option value="#06b6d4">Ciano</option>
+                            <option value="#ec4899">Rosa</option>
+                            <option value="#64748b">Cinza</option>
+                        </select>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg px-3 py-2 transition-all">
+                            Adicionar Categoria
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Listagem de Categorias Existentes -->
+                <div>
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Categorias Atuais</div>
+                    <div id="categoryManagerList" class="space-y-2 max-h-[220px] overflow-y-auto pr-1 hide-scrollbar">
+                        <!-- Gerado via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: Backup e Sincronização (FInal/Limpar tudo) -->
+    <div id="modalBackup" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="modalBackupContent">
+            <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">Backup & Ações Globais</h3>
+                <button onclick="closeBackupMenu()" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all duration-150">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3">
+                <button onclick="exportToCSV()" class="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-indigo-50/50 rounded-xl border border-slate-100 text-left transition-all duration-150">
+                    <div class="flex items-center space-x-3">
+                        <span class="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><i class="fa-solid fa-file-csv text-base"></i></span>
+                        <div>
+                            <div class="text-sm font-bold text-slate-800">Exportar Planilha (CSV)</div>
+                            <div class="text-xs text-slate-400">Baixar dados para abrir no Excel</div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+                </button>
+
+                <button onclick="triggerImport()" class="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-emerald-50/30 rounded-xl border border-slate-100 text-left transition-all duration-150">
+                    <div class="flex items-center space-x-3">
+                        <span class="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><i class="fa-solid fa-cloud-arrow-up text-base"></i></span>
+                        <div>
+                            <div class="text-sm font-bold text-slate-800">Importar Backup</div>
+                            <div class="text-xs text-slate-400">Restaurar de arquivo CSV salvo</div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+                </button>
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="importFromCSV(event)">
+
+                <button onclick="requestResetConfirmation()" class="w-full flex items-center justify-between p-3.5 bg-rose-50/50 hover:bg-rose-50 rounded-xl border border-rose-100 text-left transition-all duration-150">
+                    <div class="flex items-center space-x-3">
+                        <span class="p-2 bg-rose-50 text-rose-600 rounded-lg"><i class="fa-solid fa-trash-can text-base"></i></span>
+                        <div>
+                            <div class="text-sm font-bold text-slate-800 text-rose-700">Limpar Tudo</div>
+                            <div class="text-xs text-rose-400">Apagar todos os dados registrados</div>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: Confirmação Customizada (Substitui confirm() nativo de forma segura) -->
+    <div id="modalConfirm" class="fixed inset-0 z-[60] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="modalConfirmContent">
+            <div class="p-5 text-center">
+                <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3.5">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-900" id="confirmTitle">Você tem certeza?</h3>
+                <p class="text-xs text-slate-500 mt-1.5 leading-relaxed" id="confirmDescription">Esta ação é permanente e não poderá ser desfeita.</p>
+            </div>
+            <div class="px-5 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end space-x-2">
+                <button onclick="closeConfirmModal()" class="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-500 text-xs font-semibold transition-all duration-150">Cancelar</button>
+                <button id="btnConfirmAction" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-all duration-150">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Chave de salvamento única local para iPhone
+        const STORAGE_KEY = 'financas_pro_db_v5_clean';
+
+        // Categorias Padrão Iniciais
+        const defaultCategories = [
+            { id: 'cat_salario', name: 'Salário', type: 'receita', color: '#10b981' },
+            { id: 'cat_invest', name: 'Rendimentos', type: 'receita', color: '#06b6d4' },
+            { id: 'cat_moradia', name: 'Moradia', type: 'despesa', color: '#f59e0b' },
+            { id: 'cat_aliment', name: 'Alimentação', type: 'despesa', color: '#ef4444' },
+            { id: 'cat_transporte', name: 'Transporte', type: 'despesa', color: '#06b6d4' },
+            { id: 'cat_saude', name: 'Saúde', type: 'despesa', color: '#ec4899' },
+            { id: 'cat_lazer', name: 'Lazer', type: 'despesa', color: '#8b5cf6' },
+            { id: 'cat_educacao', name: 'Educação', type: 'despesa', color: '#3b82f6' },
+            { id: 'cat_outros', name: 'Outros', type: 'despesa', color: '#64748b' }
+        ];
+
+        // Limites de Orçamento Padrão Iniciais (R$ 0,00 para começar do zero)
+        const defaultBudgets = {
+            'cat_moradia': 0,
+            'cat_aliment': 0,
+            'cat_transporte': 0,
+            'cat_saude': 0,
+            'cat_lazer': 0,
+            'cat_educacao': 0,
+            'cat_outros': 0
+        };
+
+        // Estado do Aplicativo
+        let appState = {
+            transactions: [],
+            categories: [...defaultCategories],
+            budgets: {...defaultBudgets}
+        };
+
+        // Objeto global para controle do Chart.js
+        let expensesChart = null;
+        let confirmActionCallback = null;
+
+        // Recuperar ou inicializar banco local
+        function loadDatabase() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    appState = JSON.parse(stored);
+                    // Garante que categorias básicas e orçamentos existem
+                    if (!appState.categories || appState.categories.length === 0) appState.categories = [...defaultCategories];
+                    if (!appState.budgets) appState.budgets = {...defaultBudgets};
+                } catch (e) {
+                    initEmptyState();
+                }
+            } else {
+                initEmptyState();
+            }
+        }
+
+        function initEmptyState() {
+            appState = {
+                transactions: [], // 100% Zerado para começar limpo
+                categories: [...defaultCategories],
+                budgets: {...defaultBudgets}
+            };
+            saveDatabase();
+        }
+
+async function saveDatabase() {
+    // 1. Manter a cópia local para performance (opcional, mas bom ter)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+
+    // 2. Enviar para o Firestore (a mágica da sincronização)
+    try {
+        if (window.docRef) {
+            await setDoc(window.docRef, appState);
+            console.log("Dados salvos na nuvem com sucesso!");
+        }
+    } catch (e) {
+        console.error("Erro ao salvar no Firebase:", e);
+    }
+}
+        function renderCategoryManager() {
+            const container = document.getElementById('categoryManagerList');
+            container.innerHTML = '';
+
+            appState.categories.forEach(cat => {
+                const isDefault = defaultCategories.some(dc => dc.id === cat.id);
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg border border-slate-100 transition-all text-xs";
+                
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="w-3 h-3 rounded-full" style="background-color: ${cat.color}"></span>
+                        <span class="font-semibold text-slate-800">${cat.name}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${cat.type === 'receita' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}">${cat.type}</span>
+                    </div>
+                    ${!isDefault ? `
+                    <button onclick="requestDeleteCategory('${cat.id}')" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition-all">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                    ` : '<span class="text-[9px] text-slate-300 italic font-normal">Sistema</span>'}
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function addCategory(e) {
+            e.preventDefault();
+            const nameInput = document.getElementById('newCatName');
+            const typeInput = document.getElementById('newCatType');
+            const colorInput = document.getElementById('newCatColor');
+
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            // Evitar duplicados
+            if (appState.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                alertCustom("Atenção", "Esta categoria já existe.");
+                return;
+            }
+
+            const newId = 'cat_' + Date.now();
+            const newCat = {
+                id: newId,
+                name: name,
+                type: typeInput.value,
+                color: colorInput.value
+            };
+
+            appState.categories.push(newCat);
+            
+            // Inicializar orçamento caso seja despesa
+            if (newCat.type === 'despesa') {
+                appState.budgets[newId] = 0;
+            }
+
+            saveDatabase();
+            nameInput.value = '';
+            renderCategoryManager();
+            populateCategorySelectors();
+            renderBudgets();
+            updateDashboard();
+        }
+
+        function requestDeleteCategory(catId) {
+            confirmCustom("Excluir Categoria", "Deseja realmente apagar esta categoria? Lançamentos associados a ela serão classificados como 'Outros'.", () => {
+                const catToDelete = appState.categories.find(c => c.id === catId);
+                if (catToDelete) {
+                    // Atualiza transações associadas para 'Outros'
+                    appState.transactions.forEach(t => {
+                        if (t.category === catToDelete.name) {
+                            t.category = 'Outros';
+                        }
+                    });
+                    appState.categories = appState.categories.filter(c => c.id !== catId);
+                    if (appState.budgets[catId] !== undefined) {
+                        delete appState.budgets[catId];
+                    }
+                    saveDatabase();
+                    renderCategoryManager();
+                    populateCategorySelectors();
+                    renderBudgets();
+                    updateDashboard();
+                }
+            });
+        }
+
+        function getSelectedPeriod() {
+            const filterVal = document.getElementById('globalPeriodFilter').value;
+            if (!filterVal) return { year: 2026, month: 6 }; // fallback inicial
+            const [year, month] = filterVal.split('-');
+            return { year: parseInt(year), month: parseInt(month) };
+        }
+
+        function renderTransactions() {
+            const searchVal = document.getElementById('tableSearch').value.toLowerCase();
+            const typeFilter = document.getElementById('filterType').value;
+            const { year, month } = getSelectedPeriod();
+
+            const tbody = document.getElementById('transactionTableBody');
+            tbody.innerHTML = '';
+
+            // Filtragem avançada das transações por Período, Busca e Tipo
+            const filtered = appState.transactions.filter(tx => {
+                const txDate = new Date(tx.date + 'T00:00:00');
+                const matchPeriod = txDate.getFullYear() === year && (txDate.getMonth() + 1) === month;
+                const matchSearch = tx.description.toLowerCase().includes(searchVal) || tx.category.toLowerCase().includes(searchVal);
+                const matchType = typeFilter === 'all' || tx.type === typeFilter;
+                return matchPeriod && matchSearch && matchType;
+            });
+
+            // Ordenação decrescente por data
+            filtered.sort((a, b) => new Date(b.date + 'T00:00:00') - new Date(a.date + 'T00:00:00'));
+
+            if (filtered.length === 0) {
+                document.getElementById('tableEmptyState').classList.remove('hidden');
+            } else {
+                document.getElementById('tableEmptyState').classList.add('hidden');
+            }
+
+            filtered.forEach(tx => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-50/80 transition-all border-b border-slate-100 last:border-b-0";
+
+                // Formatação Data
+                const dateParts = tx.date.split('-');
+                const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
+
+                // Mapear cor da categoria
+                const catObj = appState.categories.find(c => c.name === tx.category);
+                const catColor = catObj ? catObj.color : '#64748b';
+
+                row.innerHTML = `
+                    <td class="py-3 px-5 text-slate-400 text-xs font-semibold">${formattedDate}</td>
+                    <td class="py-3 px-5">
+                        <div class="font-semibold text-slate-800">${tx.description}</div>
+                    </td>
+                    <td class="py-3 px-5">
+                        <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold" style="color: ${catColor}; background-color: ${catColor}15">
+                            <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${catColor}"></span>
+                            <span>${tx.category}</span>
+                        </span>
+                    </td>
+                    <td class="py-3 px-5 text-center">
+                        <button onclick="toggleStatus('${tx.id}')" class="px-2 py-1 rounded-lg text-xs font-bold transition-all duration-150 ${tx.status === 'Pago' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}">
+                            ${tx.status === 'Pago' ? '<i class="fa-solid fa-circle-check mr-1"></i>Pago' : '<i class="fa-solid fa-clock mr-1"></i>Pendente'}
+                        </button>
+                    </td>
+                    <td class="py-3 px-5 text-right font-bold text-base ${tx.type === 'receita' ? 'text-emerald-600' : 'text-slate-800'}">
+                        ${tx.type === 'receita' ? '+' : '-'} ${formatCurrency(tx.value)}
+                    </td>
+                    <td class="py-3 px-5 text-center">
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="editTransaction('${tx.id}')" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Editar">
+                                <i class="fa-solid fa-pen-to-square pointer-events-none"></i>
+                            </button>
+                            <button onclick="requestDeleteTransaction('${tx.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Excluir">
+                                <i class="fa-solid fa-trash-can pointer-events-none"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Atualização resumo footer
+            document.getElementById('tableSummaryText').textContent = `Mostrando ${filtered.length} lançamento(s)`;
+            const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            document.getElementById('tableSelectedMonthText').textContent = `${monthNames[month - 1]} de ${year}`;
+        }
+
+        function updateDashboard() {
+            const { year, month } = getSelectedPeriod();
+
+            // Filtragem das transações do período
+            const currentTxs = appState.transactions.filter(tx => {
+                const txDate = new Date(tx.date + 'T00:00:00');
+                return txDate.getFullYear() === year && (txDate.getMonth() + 1) === month;
+            });
+
+            // Totalizadores
+            const totalReceitas = currentTxs.filter(t => t.type === 'receita').reduce((sum, t) => sum + t.value, 0);
+            const totalDespesas = currentTxs.filter(t => t.type === 'despesa').reduce((sum, t) => sum + t.value, 0);
+            const saldo = totalReceitas - totalDespesas;
+
+            // Inserção visual
+            document.getElementById('kpiReceitas').textContent = formatCurrency(totalReceitas);
+            document.getElementById('kpiDespesas').textContent = formatCurrency(totalDespesas);
+            document.getElementById('kpiSaldo').textContent = formatCurrency(saldo);
+
+            // Altera estilo do saldo
+            const kpiSaldoEl = document.getElementById('kpiSaldo');
+            const kpiSaldoStatus = document.getElementById('kpiSaldoStatus');
+            if (saldo >= 0) {
+                kpiSaldoEl.className = "text-2xl font-extrabold text-slate-900 tracking-tight";
+                kpiSaldoStatus.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Equilibrado`;
+                kpiSaldoStatus.className = "font-semibold text-emerald-600 flex items-center mr-1";
+            } else {
+                kpiSaldoEl.className = "text-2xl font-extrabold text-rose-600 tracking-tight";
+                kpiSaldoStatus.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i> Déficit`;
+                kpiSaldoStatus.className = "font-semibold text-rose-600 flex items-center mr-1";
+            }
+
+            // Economia
+            let economiaPercent = 0;
+            if (totalReceitas > 0) {
+                economiaPercent = Math.max(0, Math.round((saldo / totalReceitas) * 100));
+            }
+            document.getElementById('kpiEconomia').textContent = `${economiaPercent}%`;
+            document.getElementById('kpiEconomiaBar').style.width = `${economiaPercent}%`;
+
+            // Atualização dos Gráficos e Limites de Progresso
+            renderChart(currentTxs);
+            renderBudgets();
+        }
+
+        function renderChart(currentTxs) {
+            const expensesOnly = currentTxs.filter(t => t.type === 'despesa');
+            
+            // Agrupar gastos por categoria
+            const grouped = {};
+            expensesOnly.forEach(tx => {
+                grouped[tx.category] = (grouped[tx.category] || 0) + tx.value;
+            });
+
+            const labels = Object.keys(grouped);
+            const data = Object.values(grouped);
+
+            const placeholder = document.getElementById('chartPlaceholder');
+            const canvas = document.getElementById('expensesChart');
+
+            if (data.length === 0) {
+                placeholder.classList.remove('hidden');
+                canvas.classList.add('hidden');
+                return;
+            } else {
+                placeholder.classList.add('hidden');
+                canvas.classList.remove('hidden');
+            }
+
+            // Cores baseadas nas categorias cadastradas
+            const colors = labels.map(label => {
+                const cat = appState.categories.find(c => c.name === label);
+                return cat ? cat.color : '#64748b';
+            });
+
+            if (expensesChart) {
+                expensesChart.destroy();
+            }
+
+            expensesChart = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 3,
+                        borderColor: '#ffffff',
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 10,
+                                padding: 15,
+                                font: {
+                                    family: "'Inter', sans-serif",
+                                    size: 11,
+                                    weight: 'bold'
+                                },
+                                color: '#475569'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` R$ ${context.raw.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function renderBudgets() {
+            const container = document.getElementById('budgetProgressList');
+            container.innerHTML = '';
+
+            const { year, month } = getSelectedPeriod();
+
+            // Filtrar despesas do mês corrente
+            const currentMonthExpenses = appState.transactions.filter(tx => {
+                const txDate = new Date(tx.date + 'T00:00:00');
+                return tx.type === 'despesa' && txDate.getFullYear() === year && (txDate.getMonth() + 1) === month;
+            });
+
+            // Somar gastos de cada categoria
+            const spentByCategory = {};
+            currentMonthExpenses.forEach(tx => {
+                spentByCategory[tx.category] = (spentByCategory[tx.category] || 0) + tx.value;
+            });
+
+            // Mapear limites cadastrados
+            const expenseCategories = appState.categories.filter(c => c.type === 'despesa');
+
+            let hasBudgets = false;
+
+            expenseCategories.forEach(cat => {
+                const categoryLimit = appState.budgets[cat.id] || 0;
+                
+                // Só mostra categorias que tenham um limite definido maior que zero
+                if (categoryLimit > 0) {
+                    hasBudgets = true;
+                    const spent = spentByCategory[cat.name] || 0;
+                    const percent = Math.min(100, Math.round((spent / categoryLimit) * 100));
+                    
+                    let progressColorClass = 'bg-indigo-600';
+                    if (percent >= 100) {
+                        progressColorClass = 'bg-rose-500';
+                    } else if (percent >= 85) {
+                        progressColorClass = 'bg-amber-500';
+                    } else {
+                        progressColorClass = 'bg-emerald-500';
+                    }
+
+                    const item = document.createElement('div');
+                    item.className = "space-y-1.5 p-3 bg-slate-50 rounded-xl border border-slate-100";
+                    item.innerHTML = `
+                        <div class="flex items-center justify-between text-xs font-semibold">
+                            <span class="flex items-center space-x-2 text-slate-700">
+                                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span>
+                                <span>${cat.name}</span>
+                            </span>
+                            <span class="text-slate-500">${formatCurrency(spent)} <span class="text-[10px] text-slate-400 font-normal">/ ${formatCurrency(categoryLimit)}</span></span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500 ${progressColorClass}" style="width: ${percent}%"></div>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="${percent >= 100 ? 'text-rose-600 font-bold' : 'text-slate-400'}">${percent}% utilizado</span>
+                            ${percent >= 100 ? '<span class="text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Limite estourado</span>' : ''}
+                        </div>
+                    `;
+                    container.appendChild(item);
+                }
+            });
+
+            if (!hasBudgets) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-xl border border-dashed border-slate-100 flex-1 min-h-[180px]">
+                        <span class="text-slate-400 mb-2"><i class="fa-solid fa-bullseye text-lg"></i></span>
+                        <div class="text-xs font-bold text-slate-700">Nenhum limite estipulado</div>
+                        <p class="text-[10px] text-slate-400 mt-1 max-w-[200px]">Clique em "Limites" acima para configurar suas metas de orçamento mensais.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function animateModal(elementId, action) {
+            const el = document.getElementById(elementId);
+            const content = el.querySelector('.relative');
+            
+            if (action === 'open') {
+                el.classList.remove('hidden');
+                setTimeout(() => {
+                    content.classList.remove('scale-95', 'opacity-0');
+                    content.classList.add('scale-100', 'opacity-100');
+                }, 50);
+            } else {
+                content.classList.remove('scale-100', 'opacity-100');
+                content.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    el.classList.add('hidden');
+                }, 200);
+            }
+        }
+
+        function openTransactionModal(type, editId = null) {
+            document.getElementById('txType').value = type;
+            document.getElementById('txId').value = editId || '';
+            
+            // Definição visual baseada em Receita/Despesa
+            const titleEl = document.getElementById('modalTransactionTitle');
+            const headerEl = document.getElementById('modalTransactionHeader');
+            const btnSave = document.getElementById('btnSaveTx');
+
+            if (type === 'receita') {
+                titleEl.textContent = editId ? 'Editar Receita' : 'Nova Receita';
+                headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-emerald-100 bg-emerald-50/50";
+                btnSave.className = "px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-all duration-150";
+            } else {
+                titleEl.textContent = editId ? 'Editar Despesa' : 'Nova Despesa';
+                headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-rose-100 bg-rose-50/50";
+                btnSave.className = "px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-sm transition-all duration-150";
+            }
+
+            populateCategorySelectors();
+
+            if (editId) {
+                const tx = appState.transactions.find(t => t.id === editId);
+                if (tx) {
+                    document.getElementById('txDesc').value = tx.description;
+                    document.getElementById('txValue').value = tx.value;
+                    document.getElementById('txDate').value = tx.date;
+                    document.getElementById('txCategory').value = tx.category;
+                    document.getElementById('txStatus').value = tx.status;
+                }
+            } else {
+                document.getElementById('formTransaction').reset();
+                // Data de hoje padrão simplificada
+                document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+            }
+
+            animateModal('modalTransaction', 'open');
+        }
+
+        function closeTransactionModal() {
+            animateModal('modalTransaction', 'close');
+        }
+
+        function openBudgetModal() {
+            const container = document.getElementById('budgetInputsContainer');
+            container.innerHTML = '';
+
+            const expenseCategories = appState.categories.filter(c => c.type === 'despesa');
+
+            expenseCategories.forEach(cat => {
+                const limit = appState.budgets[cat.id] || 0;
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between space-x-3";
+                
+                // Nota: Usamos step="0.01" para remover as restrições de múltiplos de 10
+                div.innerHTML = `
+                    <label class="text-xs font-semibold text-slate-700 flex items-center space-x-2 flex-1">
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span>
+                        <span>${cat.name}</span>
+                    </label>
+                    <div class="relative max-w-[150px]">
+                        <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-[10px] text-slate-400 font-bold">R$</span>
+                        <input type="number" step="0.01" min="0" value="${limit}" data-cat-id="${cat.id}" class="w-full bg-slate-50 border border-slate-200 text-xs font-bold rounded-lg pl-8 pr-2.5 py-1.5 focus:border-indigo-500 focus:bg-white outline-none transition-all duration-150">
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            animateModal('modalBudget', 'open');
+        }
+
+        function closeBudgetModal() {
+            animateModal('modalBudget', 'close');
+        }
+
+        function openCategoryModal() {
+            renderCategoryManager();
+            animateModal('modalCategory', 'open');
+        }
+
+        function closeCategoryModal() {
+            animateModal('modalCategory', 'close');
+        }
+
+        function openBackupMenu() {
+            animateModal('modalBackup', 'open');
+        }
+
+        function closeBackupMenu() {
+            animateModal('modalBackup', 'close');
+        }
+
+        // MODAL CONFIRMAÇÃO PERSONALIZADO (Evita o confirm() nativo)
+        function confirmCustom(title, description, onConfirm) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmDescription').textContent = description;
+            
+            confirmActionCallback = onConfirm;
+            
+            animateModal('modalConfirm', 'open');
+        }
+
+        function closeConfirmModal() {
+            animateModal('modalConfirm', 'close');
+            confirmActionCallback = null;
+        }
+
+        document.getElementById('btnConfirmAction').addEventListener('click', () => {
+            if (confirmActionCallback) {
+                confirmActionCallback();
+            }
+            closeConfirmModal();
+        });
+
+        function alertCustom(title, message) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmDescription').textContent = message;
+            
+            // Oculta o botão de cancelar e redefine o de confirmação para apenas fechar
+            const btnConfirm = document.getElementById('btnConfirmAction');
+            btnConfirm.textContent = "OK";
+            btnConfirm.className = "px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all duration-150";
+            
+            const cancelBtn = document.querySelector('#modalConfirm button[onclick="closeConfirmModal()"]');
+            cancelBtn.classList.add('hidden');
+
+            confirmActionCallback = () => {
+                // Restaura visual padrão
+                btnConfirm.textContent = "Confirmar";
+                btnConfirm.className = "px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-all duration-150";
+                cancelBtn.classList.remove('hidden');
+            };
+
+            animateModal('modalConfirm', 'open');
+        }
+
+        function saveTransaction(e) {
+            e.preventDefault();
+
+            const txId = document.getElementById('txId').value;
+            const type = document.getElementById('txType').value;
+            const desc = document.getElementById('txDesc').value.trim();
+            const val = parseFloat(document.getElementById('txValue').value);
+            const date = document.getElementById('txDate').value;
+            const cat = document.getElementById('txCategory').value;
+            const status = document.getElementById('txStatus').value;
+
+            if (!desc || isNaN(val) || !date || !cat) return;
+
+            if (txId) {
+                // Edição
+                const tx = appState.transactions.find(t => t.id === txId);
+                if (tx) {
+                    tx.description = desc;
+                    tx.value = val;
+                    tx.date = date;
+                    tx.category = cat;
+                    tx.status = status;
+                }
+            } else {
+                // Nova
+                const newTx = {
+                    id: 'tx_' + Date.now(),
+                    type: type,
+                    description: desc,
+                    value: val,
+                    date: date,
+                    category: cat,
+                    status: status
+                };
+                appState.transactions.push(newTx);
+            }
+
+            saveDatabase();
+            closeTransactionModal();
+            renderTransactions();
+            updateDashboard();
+        }
+
+        function toggleStatus(txId) {
+            const tx = appState.transactions.find(t => t.id === txId);
+            if (tx) {
+                tx.status = tx.status === 'Pago' ? 'Pendente' : 'Pago';
+                saveDatabase();
+                renderTransactions();
+                updateDashboard();
+            }
+        }
+
+        function editTransaction(txId) {
+            const tx = appState.transactions.find(t => t.id === txId);
+            if (tx) {
+                openTransactionModal(tx.type, txId);
+            }
+        }
+
+        function requestDeleteTransaction(txId) {
+            confirmCustom("Excluir Transação", "Deseja realmente remover permanentemente este lançamento?", () => {
+                appState.transactions = appState.transactions.filter(t => t.id !== txId);
+                saveDatabase();
+                renderTransactions();
+                updateDashboard();
+            });
+        }
+
+        function saveBudgets(e) {
+            e.preventDefault();
+            const inputs = document.getElementById('budgetInputsContainer').querySelectorAll('input');
+            
+            inputs.forEach(inp => {
+                const catId = inp.getAttribute('data-cat-id');
+                const val = parseFloat(inp.value) || 0;
+                appState.budgets[catId] = val;
+            });
+
+            saveDatabase();
+            closeBudgetModal();
+            updateDashboard();
+        }
+
+        function requestResetConfirmation() {
+            closeBackupMenu();
+            confirmCustom("Restaurar Sistema", "Isso apagará todas as suas transações e categorias personalizadas do celular. Deseja prosseguir?", () => {
+                initEmptyState();
+                renderTransactions();
+                updateDashboard();
+            });
+        }
+
+        // Exportação formato CSV compatível Excel / Google Sheets
+        function exportToCSV() {
+            closeBackupMenu();
+            if (appState.transactions.length === 0) {
+                alertCustom("Sem dados", "Você não possui lançamentos cadastrados para exportar.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // BOM para acentuação Excel
+            csvContent += "Data,Tipo,Descricao,Categoria,Valor,Status\n";
+
+            appState.transactions.forEach(tx => {
+                const descEscaped = tx.description.replace(/"/g, '""');
+                csvContent += `"${tx.date}","${tx.type}","${descEscaped}","${tx.category}",${tx.value},"${tx.status}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `planilha_financeira_pro_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function triggerImport() {
+            closeBackupMenu();
+            document.getElementById('csvFileInput').click();
+        }
+
+        // Importação de arquivo CSV de backup
+        function importFromCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                if (lines.length < 2) {
+                    alertCustom("Erro", "Arquivo CSV de backup inválido.");
+                    return;
+                }
+
+                const importedTransactions = [];
+                // Pula a linha de cabeçalho
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    // Regex para ler CSV respeitando as aspas
+                    const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+                    const cleanParts = parts.map(p => p.replace(/^"|"$/g, '').trim());
+
+                    if (cleanParts.length >= 6) {
+                        const [date, type, description, category, value, status] = cleanParts;
+                        
+                        importedTransactions.push({
+                            id: 'tx_imported_' + Date.now() + '_' + i,
+                            date: date,
+                            type: type,
+                            description: description,
+                            category: category,
+                            value: parseFloat(value) || 0,
+                            status: status
+                        });
+                    }
+                }
+
+                if (importedTransactions.length > 0) {
+                    confirmCustom("Substituir dados?", `Encontramos ${importedTransactions.length} lançamentos. Deseja adicioná-los ao banco atual?`, () => {
+                        appState.transactions = [...appState.transactions, ...importedTransactions];
+                        saveDatabase();
+                        renderTransactions();
+                        updateDashboard();
+                    });
+                } else {
+                    alertCustom("Erro", "Nenhum dado válido pôde ser importado.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // reseta file input
+        }
+
+        // Formatação monetária
+        function formatCurrency(v) {
+            return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        // Ativação de Eventos
+        document.getElementById('globalPeriodFilter').addEventListener('change', () => {
+            renderTransactions();
+            updateDashboard();
+        });
+
+        document.getElementById('tableSearch').addEventListener('input', renderTransactions);
+        document.getElementById('filterType').addEventListener('change', renderTransactions);
+
+        // Ao Carregar a Página
+        window.onload = function () {
+            // Define o seletor de mês padrão para o atual
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
+            document.getElementById('globalPeriodFilter').value = `${currentYear}-${currentMonth}`;
+
+            // REMOVA OU COMENTE A LINHA ABAIXO:
+            // loadDatabase(); 
+            
+            // Mantenha estas para renderizar a interface inicial
+            renderTransactions();
+            updateDashboard();
+        }
+    </script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+ 	  apiKey: "AIzaSyDEFod5syUXNmAYoCyNJKX2jHPSm94Dt_4",
+	  authDomain: "financeiro-ec7c7.firebaseapp.com",
+ 	  projectId: "financeiro-ec7c7",
+	  storageBucket: "financial-ec7c7.firebasestorage.app",
+	  messagingsenderId: "473393461943",
+ 	  appid: "1:473393461943:web:f2435782c5700dcf152b32"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Variável global para acessar o DB de qualquer lugar
+    window.db = db;
+    window.docRef = doc(db, "financas", "dados_casal"); // Onde os dados moram na nuvem
+
+    // Sincronização em tempo real (Substitui o carregamento manual)
+    onSnapshot(window.docRef, (doc) => {
+        if (doc.exists()) {
+            window.appState = doc.data();
+            // Atualiza a tela automaticamente
+            renderTransactions();
+            updateDashboard();
+            renderCategoryManager();
+            renderBudgets();
+        }
+    });
+</script>
+</body>
+</html>
