@@ -913,44 +913,51 @@ async function saveDatabase() {
             }
         }
 
-        function openTransactionModal(type, editId = null) {
-            document.getElementById('txType').value = type;
-            document.getElementById('txId').value = editId || '';
-            
-            // Definição visual baseada em Receita/Despesa
-            const titleEl = document.getElementById('modalTransactionTitle');
-            const headerEl = document.getElementById('modalTransactionHeader');
-            const btnSave = document.getElementById('btnSaveTx');
+function openTransactionModal(type, editId = null) {
+    const set = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    };
 
-            if (type === 'receita') {
-                titleEl.textContent = editId ? 'Editar Receita' : 'Nova Receita';
-                headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-emerald-100 bg-emerald-50/50";
-                btnSave.className = "px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-all duration-150";
-            } else {
-                titleEl.textContent = editId ? 'Editar Despesa' : 'Nova Despesa';
-                headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-rose-100 bg-rose-50/50";
-                btnSave.className = "px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-sm transition-all duration-150";
-            }
+    set('txType', type);
+    set('txId', editId || '');
 
-            populateCategorySelectors();
+    const titleEl = document.getElementById('modalTransactionTitle');
+    const headerEl = document.getElementById('modalTransactionHeader');
+    const btnSave = document.getElementById('btnSaveTx');
 
-            if (editId) {
-                const tx = appState.transactions.find(t => t.id === editId);
-                if (tx) {
-                    document.getElementById('txDesc').value = tx.description;
-                    document.getElementById('txValue').value = tx.value;
-                    document.getElementById('txDate').value = tx.date;
-                    document.getElementById('txCategory').value = tx.category;
-                    document.getElementById('txStatus').value = tx.status;
-                }
-            } else {
-                document.getElementById('formTransaction').reset();
-                // Data de hoje padrão simplificada
-                document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
-            }
+    if (type === 'receita') {
+        if (titleEl) titleEl.textContent = editId ? 'Editar Receita' : 'Nova Receita';
+        if (headerEl) headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-emerald-100 bg-emerald-50/50";
+        if (btnSave) btnSave.className = "px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold";
+    } else {
+        if (titleEl) titleEl.textContent = editId ? 'Editar Despesa' : 'Nova Despesa';
+        if (headerEl) headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-rose-100 bg-rose-50/50";
+        if (btnSave) btnSave.className = "px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold";
+    }
 
-            animateModal('modalTransaction', 'open');
+    if (typeof populateCategorySelectors === 'function') {
+        populateCategorySelectors();
+    }
+
+    if (editId) {
+        const tx = appState.transactions.find(t => t.id === editId);
+        if (tx) {
+            set('txDesc', tx.description);
+            set('txValue', tx.value);
+            set('txDate', tx.date);
+            set('txCategory', tx.category);
+            set('txStatus', tx.status);
         }
+    } else {
+        const form = document.getElementById('formTransaction');
+        if (form) form.reset();
+
+        set('txDate', new Date().toISOString().split('T')[0]);
+    }
+
+    animateModal('modalTransaction', 'open');
+}
 
         function closeTransactionModal() {
             animateModal('modalTransaction', 'close');
