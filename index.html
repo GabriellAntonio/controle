@@ -451,7 +451,8 @@
     </div>
 
     <script>
-        // Chave de salvamento única local para iPhone
+  <script>
+        // Chave de salvamento única local para iPhone (Fallback)
         const STORAGE_KEY = 'financas_pro_db_v5_clean';
 
         // Categorias Padrão Iniciais
@@ -467,7 +468,7 @@
             { id: 'cat_outros', name: 'Outros', type: 'despesa', color: '#64748b' }
         ];
 
-        // Limites de Orçamento Padrão Iniciais (R$ 0,00 para começar do zero)
+        // Limites de Orçamento Padrão Iniciais
         const defaultBudgets = {
             'cat_moradia': 0,
             'cat_aliment': 0,
@@ -478,8 +479,8 @@
             'cat_outros': 0
         };
 
-        // Estado do Aplicativo
-        let appState = {
+        // Estado do Aplicativo Unificado na Window para o Firebase espelhar corretamente
+        window.appState = {
             transactions: [],
             categories: [...defaultCategories],
             budgets: {...defaultBudgets}
@@ -489,51 +490,36 @@
         let expensesChart = null;
         let confirmActionCallback = null;
 
-        // Recuperar ou inicializar banco local
-        function loadDatabase() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                try {
-                    appState = JSON.parse(stored);
-                    // Garante que categorias básicas e orçamentos existem
-                    if (!appState.categories || appState.categories.length === 0) appState.categories = [...defaultCategories];
-                    if (!appState.budgets) appState.budgets = {...defaultBudgets};
-                } catch (e) {
-                    initEmptyState();
-                }
-            } else {
-                initEmptyState();
-            }
-        }
-
         function initEmptyState() {
-            appState = {
-                transactions: [], // 100% Zerado para começar limpo
+            window.appState = {
+                transactions: [], 
                 categories: [...defaultCategories],
                 budgets: {...defaultBudgets}
             };
             saveDatabase();
         }
 
-async function saveDatabase() {
-    // 1. Manter a cópia local para performance (opcional, mas bom ter)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        async function saveDatabase() {
+            // 1. Salva no LocalStorage para redundância e performance offline
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(window.appState));
 
-    // 2. Enviar para o Firestore (a mágica da sincronização)
-    try {
-        if (window.docRef) {
-            await setDoc(window.docRef, appState);
-            console.log("Dados salvos na nuvem com sucesso!");
+            // 2. Envia para o Firestore usando o despachante global configurado no módulo
+            try {
+                if (window.firebaseSaveFn) {
+                    await window.firebaseSaveFn(window.appState);
+                    console.log("Dados salvos na nuvem com sucesso!");
+                }
+            } catch (e) {
+                console.error("Erro ao salvar no Firebase:", e);
+            }
         }
-    } catch (e) {
-        console.error("Erro ao salvar no Firebase:", e);
-    }
-}
+
         function renderCategoryManager() {
             const container = document.getElementById('categoryManagerList');
+            if (!container) return;
             container.innerHTML = '';
 
-            appState.categories.forEach(cat => {
+            window.appState.categories.forEach(cat => {
                 const isDefault = defaultCategories.some(dc => dc.id === cat.id);
                 const item = document.createElement('div');
                 item.className = "flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg border border-slate-100 transition-all text-xs";
@@ -563,8 +549,7 @@ async function saveDatabase() {
             const name = nameInput.value.trim();
             if (!name) return;
 
-            // Evitar duplicados
-            if (appState.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+            if (window.appState.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
                 alertCustom("Atenção", "Esta categoria já existe.");
                 return;
             }
@@ -577,11 +562,10 @@ async function saveDatabase() {
                 color: colorInput.value
             };
 
-            appState.categories.push(newCat);
+            window.appState.categories.push(newCat);
             
-            // Inicializar orçamento caso seja despesa
             if (newCat.type === 'despesa') {
-                appState.budgets[newId] = 0;
+                window.appState.budgets[newId] = 0;
             }
 
             saveDatabase();
@@ -594,17 +578,16 @@ async function saveDatabase() {
 
         function requestDeleteCategory(catId) {
             confirmCustom("Excluir Categoria", "Deseja realmente apagar esta categoria? Lançamentos associados a ela serão classificados como 'Outros'.", () => {
-                const catToDelete = appState.categories.find(c => c.id === catId);
+                const catToDelete = window.appState.categories.find(c => c.id === catId);
                 if (catToDelete) {
-                    // Atualiza transações associadas para 'Outros'
-                    appState.transactions.forEach(t => {
+                    window.appState.transactions.forEach(t => {
                         if (t.category === catToDelete.name) {
                             t.category = 'Outros';
                         }
                     });
-                    appState.categories = appState.categories.filter(c => c.id !== catId);
-                    if (appState.budgets[catId] !== undefined) {
-                        delete appState.budgets[catId];
+                    window.appState.categories = window.appState.categories.filter(c => c.id !== catId);
+                    if (window.appState.budgets[catId] !== undefined) {
+                        delete window.appState.budgets[catId];
                     }
                     saveDatabase();
                     renderCategoryManager();
@@ -617,7 +600,10 @@ async function saveDatabase() {
 
         function getSelectedPeriod() {
             const filterVal = document.getElementById('globalPeriodFilter').value;
-            if (!filterVal) return { year: 2026, month: 6 }; // fallback inicial
+            if (!filterVal) {
+                const today = new Date();
+                return { year: today.getFullYear(), month: today.getMonth() + 1 };
+            }
             const [year, month] = filterVal.split('-');
             return { year: parseInt(year), month: parseInt(month) };
         }
@@ -628,10 +614,10 @@ async function saveDatabase() {
             const { year, month } = getSelectedPeriod();
 
             const tbody = document.getElementById('transactionTableBody');
+            if (!tbody) return;
             tbody.innerHTML = '';
 
-            // Filtragem avançada das transações por Período, Busca e Tipo
-            const filtered = appState.transactions.filter(tx => {
+            const filtered = window.appState.transactions.filter(tx => {
                 const txDate = new Date(tx.date + 'T00:00:00');
                 const matchPeriod = txDate.getFullYear() === year && (txDate.getMonth() + 1) === month;
                 const matchSearch = tx.description.toLowerCase().includes(searchVal) || tx.category.toLowerCase().includes(searchVal);
@@ -639,7 +625,6 @@ async function saveDatabase() {
                 return matchPeriod && matchSearch && matchType;
             });
 
-            // Ordenação decrescente por data
             filtered.sort((a, b) => new Date(b.date + 'T00:00:00') - new Date(a.date + 'T00:00:00'));
 
             if (filtered.length === 0) {
@@ -652,12 +637,10 @@ async function saveDatabase() {
                 const row = document.createElement('tr');
                 row.className = "hover:bg-slate-50/80 transition-all border-b border-slate-100 last:border-b-0";
 
-                // Formatação Data
                 const dateParts = tx.date.split('-');
                 const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
 
-                // Mapear cor da categoria
-                const catObj = appState.categories.find(c => c.name === tx.category);
+                const catObj = window.appState.categories.find(c => c.name === tx.category);
                 const catColor = catObj ? catObj.color : '#64748b';
 
                 row.innerHTML = `
@@ -693,7 +676,6 @@ async function saveDatabase() {
                 tbody.appendChild(row);
             });
 
-            // Atualização resumo footer
             document.getElementById('tableSummaryText').textContent = `Mostrando ${filtered.length} lançamento(s)`;
             const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
             document.getElementById('tableSelectedMonthText').textContent = `${monthNames[month - 1]} de ${year}`;
@@ -702,23 +684,19 @@ async function saveDatabase() {
         function updateDashboard() {
             const { year, month } = getSelectedPeriod();
 
-            // Filtragem das transações do período
-            const currentTxs = appState.transactions.filter(tx => {
+            const currentTxs = window.appState.transactions.filter(tx => {
                 const txDate = new Date(tx.date + 'T00:00:00');
                 return txDate.getFullYear() === year && (txDate.getMonth() + 1) === month;
             });
 
-            // Totalizadores
             const totalReceitas = currentTxs.filter(t => t.type === 'receita').reduce((sum, t) => sum + t.value, 0);
             const totalDespesas = currentTxs.filter(t => t.type === 'despesa').reduce((sum, t) => sum + t.value, 0);
             const saldo = totalReceitas - totalDespesas;
 
-            // Inserção visual
             document.getElementById('kpiReceitas').textContent = formatCurrency(totalReceitas);
             document.getElementById('kpiDespesas').textContent = formatCurrency(totalDespesas);
             document.getElementById('kpiSaldo').textContent = formatCurrency(saldo);
 
-            // Altera estilo do saldo
             const kpiSaldoEl = document.getElementById('kpiSaldo');
             const kpiSaldoStatus = document.getElementById('kpiSaldoStatus');
             if (saldo >= 0) {
@@ -731,7 +709,6 @@ async function saveDatabase() {
                 kpiSaldoStatus.className = "font-semibold text-rose-600 flex items-center mr-1";
             }
 
-            // Economia
             let economiaPercent = 0;
             if (totalReceitas > 0) {
                 economiaPercent = Math.max(0, Math.round((saldo / totalReceitas) * 100));
@@ -739,15 +716,12 @@ async function saveDatabase() {
             document.getElementById('kpiEconomia').textContent = `${economiaPercent}%`;
             document.getElementById('kpiEconomiaBar').style.width = `${economiaPercent}%`;
 
-            // Atualização dos Gráficos e Limites de Progresso
             renderChart(currentTxs);
             renderBudgets();
         }
 
         function renderChart(currentTxs) {
             const expensesOnly = currentTxs.filter(t => t.type === 'despesa');
-            
-            // Agrupar gastos por categoria
             const grouped = {};
             expensesOnly.forEach(tx => {
                 grouped[tx.category] = (grouped[tx.category] || 0) + tx.value;
@@ -760,17 +734,16 @@ async function saveDatabase() {
             const canvas = document.getElementById('expensesChart');
 
             if (data.length === 0) {
-                placeholder.classList.remove('hidden');
-                canvas.classList.add('hidden');
+                if(placeholder) placeholder.classList.remove('hidden');
+                if(canvas) canvas.classList.add('hidden');
                 return;
             } else {
-                placeholder.classList.add('hidden');
-                canvas.classList.remove('hidden');
+                if(placeholder) placeholder.classList.add('hidden');
+                if(canvas) canvas.classList.remove('hidden');
             }
 
-            // Cores baseadas nas categorias cadastradas
             const colors = labels.map(label => {
-                const cat = appState.categories.find(c => c.name === label);
+                const cat = window.appState.categories.find(c => c.name === label);
                 return cat ? cat.color : '#64748b';
             });
 
@@ -799,11 +772,7 @@ async function saveDatabase() {
                             labels: {
                                 boxWidth: 10,
                                 padding: 15,
-                                font: {
-                                    family: "'Inter', sans-serif",
-                                    size: 11,
-                                    weight: 'bold'
-                                },
+                                font: { family: "'Inter', sans-serif", size: 11, weight: 'bold' },
                                 color: '#475569'
                             }
                         },
@@ -822,31 +791,27 @@ async function saveDatabase() {
 
         function renderBudgets() {
             const container = document.getElementById('budgetProgressList');
+            if(!container) return;
             container.innerHTML = '';
 
             const { year, month } = getSelectedPeriod();
 
-            // Filtrar despesas do mês corrente
-            const currentMonthExpenses = appState.transactions.filter(tx => {
+            const currentMonthExpenses = window.appState.transactions.filter(tx => {
                 const txDate = new Date(tx.date + 'T00:00:00');
                 return tx.type === 'despesa' && txDate.getFullYear() === year && (txDate.getMonth() + 1) === month;
             });
 
-            // Somar gastos de cada categoria
             const spentByCategory = {};
             currentMonthExpenses.forEach(tx => {
                 spentByCategory[tx.category] = (spentByCategory[tx.category] || 0) + tx.value;
             });
 
-            // Mapear limites cadastrados
-            const expenseCategories = appState.categories.filter(c => c.type === 'despesa');
-
+            const expenseCategories = window.appState.categories.filter(c => c.type === 'despesa');
             let hasBudgets = false;
 
             expenseCategories.forEach(cat => {
-                const categoryLimit = appState.budgets[cat.id] || 0;
+                const categoryLimit = window.appState.budgets[cat.id] || 0;
                 
-                // Só mostra categorias que tenham um limite definido maior que zero
                 if (categoryLimit > 0) {
                     hasBudgets = true;
                     const spent = spentByCategory[cat.name] || 0;
@@ -896,6 +861,7 @@ async function saveDatabase() {
 
         function animateModal(elementId, action) {
             const el = document.getElementById(elementId);
+            if(!el) return;
             const content = el.querySelector('.relative');
             
             if (action === 'open') {
@@ -913,87 +879,82 @@ async function saveDatabase() {
             }
         }
 
-function openTransactionModal(type, editId = null) {
-    const set = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.value = value;
-    };
+        function openTransactionModal(type, editId = null) {
+            const set = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            };
 
-    set('txType', type);
-    set('txId', editId || '');
+            set('txType', type);
+            set('txId', editId || '');
 
-    const titleEl = document.getElementById('modalTransactionTitle');
-    const headerEl = document.getElementById('modalTransactionHeader');
-    const btnSave = document.getElementById('btnSaveTx');
+            const titleEl = document.getElementById('modalTransactionTitle');
+            const headerEl = document.getElementById('modalTransactionHeader');
+            const btnSave = document.getElementById('btnSaveTx');
 
-    if (type === 'receita') {
-        if (titleEl) titleEl.textContent = editId ? 'Editar Receita' : 'Nova Receita';
-        if (headerEl) headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-emerald-100 bg-emerald-50/50";
-        if (btnSave) btnSave.className = "px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold";
-    } else {
-        if (titleEl) titleEl.textContent = editId ? 'Editar Despesa' : 'Nova Despesa';
-        if (headerEl) headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-rose-100 bg-rose-50/50";
-        if (btnSave) btnSave.className = "px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold";
-    }
+            if (type === 'receita') {
+                if (titleEl) titleEl.textContent = editId ? 'Editar Receita' : 'Nova Receita';
+                if (headerEl) headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-emerald-100 bg-emerald-50/50";
+                if (btnSave) btnSave.className = "px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold";
+            } else {
+                if (titleEl) titleEl.textContent = editId ? 'Editar Despesa' : 'Nova Despesa';
+                if (headerEl) headerEl.className = "px-5 py-4 flex items-center justify-between border-b border-rose-100 bg-rose-50/50";
+                if (btnSave) btnSave.className = "px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold";
+            }
 
-    if (typeof populateCategorySelectors === 'function') {
-        populateCategorySelectors();
-    }
+            populateCategorySelectors();
 
-    if (editId) {
-        const tx = appState.transactions.find(t => t.id === editId);
-        if (tx) {
-            set('txDesc', tx.description);
-            set('txValue', tx.value);
-            set('txDate', tx.date);
-            set('txCategory', tx.category);
-            set('txStatus', tx.status);
+            if (editId) {
+                const tx = window.appState.transactions.find(t => t.id === editId);
+                if (tx) {
+                    set('txDesc', tx.description);
+                    set('txValue', tx.value);
+                    set('txDate', tx.date);
+                    set('txCategory', tx.category);
+                    set('txStatus', tx.status);
+                }
+            } else {
+                const form = document.getElementById('formTransaction');
+                if (form) form.reset();
+                set('txDate', new Date().toISOString().split('T')[0]);
+            }
+
+            animateModal('modalTransaction', 'open');
         }
-    } else {
-        const form = document.getElementById('formTransaction');
-        if (form) form.reset();
-
-        set('txDate', new Date().toISOString().split('T')[0]);
-    }
-
-    animateModal('modalTransaction', 'open');
-}
 
         function closeTransactionModal() {
             animateModal('modalTransaction', 'close');
         }
 
-		function populateCategorySelectors() {
-    const selector = document.getElementById('txCategory');
-    const type = document.getElementById('txType').value;
-    
-    // Limpa as opções atuais
-    selector.innerHTML = '';
-    
-    // Filtra as categorias baseadas no tipo (receita ou despesa)
-    const filteredCategories = appState.categories.filter(c => c.type === type);
-    
-    // Adiciona as opções ao select
-    filteredCategories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.name;
-        option.textContent = cat.name;
-        selector.appendChild(option);
-    });
-}
+        function populateCategorySelectors() {
+            const selector = document.getElementById('txCategory');
+            const typeEl = document.getElementById('txType');
+            if(!selector || !typeEl) return;
+            const type = typeEl.value;
+            
+            selector.innerHTML = '';
+            const filteredCategories = window.appState.categories.filter(c => c.type === type);
+            
+            filteredCategories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.name;
+                option.textContent = cat.name;
+                selector.appendChild(option);
+            });
+        }
 
         function openBudgetModal() {
             const container = document.getElementById('budgetInputsContainer');
+            if(!container) return;
             container.innerHTML = '';
 
-            const expenseCategories = appState.categories.filter(c => c.type === 'despesa');
+            const expenseCategories = window.appState.categories.filter(c => c.type === 'despesa');
 
             expenseCategories.forEach(cat => {
-                const limit = appState.budgets[cat.id] || 0;
+                const limit = window.appState.budgets[cat.id] || 0;
                 const div = document.createElement('div');
                 div.className = "flex items-center justify-between space-x-3";
                 
-                // Nota: Usamos step="0.01" para remover as restrições de múltiplos de 10
                 div.innerHTML = `
                     <label class="text-xs font-semibold text-slate-700 flex items-center space-x-2 flex-1">
                         <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span>
@@ -1031,13 +992,10 @@ function openTransactionModal(type, editId = null) {
             animateModal('modalBackup', 'close');
         }
 
-        // MODAL CONFIRMAÇÃO PERSONALIZADO (Evita o confirm() nativo)
         function confirmCustom(title, description, onConfirm) {
             document.getElementById('confirmTitle').textContent = title;
             document.getElementById('confirmDescription').textContent = description;
-            
             confirmActionCallback = onConfirm;
-            
             animateModal('modalConfirm', 'open');
         }
 
@@ -1057,19 +1015,17 @@ function openTransactionModal(type, editId = null) {
             document.getElementById('confirmTitle').textContent = title;
             document.getElementById('confirmDescription').textContent = message;
             
-            // Oculta o botão de cancelar e redefine o de confirmação para apenas fechar
             const btnConfirm = document.getElementById('btnConfirmAction');
             btnConfirm.textContent = "OK";
             btnConfirm.className = "px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all duration-150";
             
             const cancelBtn = document.querySelector('#modalConfirm button[onclick="closeConfirmModal()"]');
-            cancelBtn.classList.add('hidden');
+            if(cancelBtn) cancelBtn.classList.add('hidden');
 
             confirmActionCallback = () => {
-                // Restaura visual padrão
                 btnConfirm.textContent = "Confirmar";
                 btnConfirm.className = "px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition-all duration-150";
-                cancelBtn.classList.remove('hidden');
+                if(cancelBtn) cancelBtn.classList.remove('hidden');
             };
 
             animateModal('modalConfirm', 'open');
@@ -1089,8 +1045,7 @@ function openTransactionModal(type, editId = null) {
             if (!desc || isNaN(val) || !date || !cat) return;
 
             if (txId) {
-                // Edição
-                const tx = appState.transactions.find(t => t.id === txId);
+                const tx = window.appState.transactions.find(t => t.id === txId);
                 if (tx) {
                     tx.description = desc;
                     tx.value = val;
@@ -1099,7 +1054,6 @@ function openTransactionModal(type, editId = null) {
                     tx.status = status;
                 }
             } else {
-                // Nova
                 const newTx = {
                     id: 'tx_' + Date.now(),
                     type: type,
@@ -1109,7 +1063,7 @@ function openTransactionModal(type, editId = null) {
                     category: cat,
                     status: status
                 };
-                appState.transactions.push(newTx);
+                window.appState.transactions.push(newTx);
             }
 
             saveDatabase();
@@ -1119,7 +1073,7 @@ function openTransactionModal(type, editId = null) {
         }
 
         function toggleStatus(txId) {
-            const tx = appState.transactions.find(t => t.id === txId);
+            const tx = window.appState.transactions.find(t => t.id === txId);
             if (tx) {
                 tx.status = tx.status === 'Pago' ? 'Pendente' : 'Pago';
                 saveDatabase();
@@ -1129,7 +1083,7 @@ function openTransactionModal(type, editId = null) {
         }
 
         function editTransaction(txId) {
-            const tx = appState.transactions.find(t => t.id === txId);
+            const tx = window.appState.transactions.find(t => t.id === txId);
             if (tx) {
                 openTransactionModal(tx.type, txId);
             }
@@ -1137,7 +1091,7 @@ function openTransactionModal(type, editId = null) {
 
         function requestDeleteTransaction(txId) {
             confirmCustom("Excluir Transação", "Deseja realmente remover permanentemente este lançamento?", () => {
-                appState.transactions = appState.transactions.filter(t => t.id !== txId);
+                window.appState.transactions = window.appState.transactions.filter(t => t.id !== txId);
                 saveDatabase();
                 renderTransactions();
                 updateDashboard();
@@ -1151,7 +1105,7 @@ function openTransactionModal(type, editId = null) {
             inputs.forEach(inp => {
                 const catId = inp.getAttribute('data-cat-id');
                 const val = parseFloat(inp.value) || 0;
-                appState.budgets[catId] = val;
+                window.appState.budgets[catId] = val;
             });
 
             saveDatabase();
@@ -1168,18 +1122,17 @@ function openTransactionModal(type, editId = null) {
             });
         }
 
-        // Exportação formato CSV compatível Excel / Google Sheets
         function exportToCSV() {
             closeBackupMenu();
-            if (appState.transactions.length === 0) {
+            if (window.appState.transactions.length === 0) {
                 alertCustom("Sem dados", "Você não possui lançamentos cadastrados para exportar.");
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // BOM para acentuação Excel
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
             csvContent += "Data,Tipo,Descricao,Categoria,Valor,Status\n";
 
-            appState.transactions.forEach(tx => {
+            window.appState.transactions.forEach(tx => {
                 const descEscaped = tx.description.replace(/"/g, '""');
                 csvContent += `"${tx.date}","${tx.type}","${descEscaped}","${tx.category}",${tx.value},"${tx.status}"\n`;
             });
@@ -1198,7 +1151,6 @@ function openTransactionModal(type, editId = null) {
             document.getElementById('csvFileInput').click();
         }
 
-        // Importação de arquivo CSV de backup
         function importFromCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1213,12 +1165,10 @@ function openTransactionModal(type, editId = null) {
                 }
 
                 const importedTransactions = [];
-                // Pula a linha de cabeçalho
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
 
-                    // Regex para ler CSV respeitando as aspas
                     const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
                     const cleanParts = parts.map(p => p.replace(/^"|"$/g, '').trim());
 
@@ -1239,7 +1189,7 @@ function openTransactionModal(type, editId = null) {
 
                 if (importedTransactions.length > 0) {
                     confirmCustom("Substituir dados?", `Encontramos ${importedTransactions.length} lançamentos. Deseja adicioná-los ao banco atual?`, () => {
-                        appState.transactions = [...appState.transactions, ...importedTransactions];
+                        window.appState.transactions = [...window.appState.transactions, ...importedTransactions];
                         saveDatabase();
                         renderTransactions();
                         updateDashboard();
@@ -1249,15 +1199,13 @@ function openTransactionModal(type, editId = null) {
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // reseta file input
+            event.target.value = ''; 
         }
 
-        // Formatação monetária
         function formatCurrency(v) {
             return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
 
-        // Ativação de Eventos
         document.getElementById('globalPeriodFilter').addEventListener('change', () => {
             renderTransactions();
             updateDashboard();
@@ -1266,53 +1214,65 @@ function openTransactionModal(type, editId = null) {
         document.getElementById('tableSearch').addEventListener('input', renderTransactions);
         document.getElementById('filterType').addEventListener('change', renderTransactions);
 
-        // Ao Carregar a Página
         window.onload = function () {
-            // Define o seletor de mês padrão para o atual
             const today = new Date();
             const currentYear = today.getFullYear();
             const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
             document.getElementById('globalPeriodFilter').value = `${currentYear}-${currentMonth}`;
 
-            // REMOVA OU COMENTE A LINHA ABAIXO:
-            // loadDatabase(); 
-            
-            // Mantenha estas para renderizar a interface inicial
+            // Carregamento inicial rápido via LocalStorage (Evita a tela piscar em branco)
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    window.appState = JSON.parse(stored);
+                } catch(e) {}
+            }
             renderTransactions();
             updateDashboard();
         }
     </script>
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const firebaseConfig = {
- 	  apiKey: "AIzaSyDEFod5syUXNmAYoCyNJKX2jHPSm94Dt_4",
-	  authDomain: "financeiro-ec7c7.firebaseapp.com",
- 	  projectId: "financeiro-ec7c7",
-	  storageBucket: "financial-ec7c7.firebasestorage.app",
-	  messagingsenderId: "473393461943",
- 	  appid: "1:473393461943:web:f2435782c5700dcf152b32"
-    };
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+        const firebaseConfig = {
+            apiKey: "AIzaSyDEFod5syUXNmAYoCyNJKX2jHPSm94Dt_4",
+            authDomain: "financeiro-ec7c7.firebaseapp.com",
+            projectId: "financeiro-ec7c7",
+            storageBucket: "financial-ec7c7.firebasestorage.app",
+            messagingSenderId: "473393461943",
+            appId: "1:473393461943:web:f2435782c5700dcf152b32"
+        };
 
-    // Variável global para acessar o DB de qualquer lugar
-    window.db = db;
-    window.docRef = doc(db, "financas", "dados_casal"); // Onde os dados moram na nuvem
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-    // Sincronização em tempo real (Substitui o carregamento manual)
-    onSnapshot(window.docRef, (doc) => {
-        if (doc.exists()) {
-            window.appState = doc.data();
-            // Atualiza a tela automaticamente
-            renderTransactions();
-            updateDashboard();
-            renderCategoryManager();
-            renderBudgets();
-        }
-    });
-</script>
+        window.db = db;
+        window.docRef = doc(db, "financas", "dados_casal"); 
+
+        // Expõe uma função de salvamento do Firestore para o escopo global de forma segura
+        window.firebaseSaveFn = async function(data) {
+            await setDoc(window.docRef, data);
+        };
+
+        // Escuta as alterações na nuvem em tempo real
+        onSnapshot(window.docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                // Alimenta o objeto unificado que as outras funções leem
+                window.appState = docSnap.data();
+                
+                // Força atualização da interface gráfica
+                renderTransactions();
+                updateDashboard();
+                renderCategoryManager();
+                renderBudgets();
+            } else {
+                // Caso a nuvem esteja 100% vazia (primeiro uso), envia a estrutura inicial padrão
+                console.log("Banco de dados em branco na nuvem. Inicializando categorias padrão...");
+                window.firebaseSaveFn(window.appState);
+            }
+        });
+    </script>
 </body>
 </html>
