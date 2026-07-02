@@ -963,6 +963,25 @@ function openTransactionModal(type, editId = null) {
             animateModal('modalTransaction', 'close');
         }
 
+		function populateCategorySelectors() {
+    const selector = document.getElementById('txCategory');
+    const type = document.getElementById('txType').value;
+    
+    // Limpa as opções atuais
+    selector.innerHTML = '';
+    
+    // Filtra as categorias baseadas no tipo (receita ou despesa)
+    const filteredCategories = appState.categories.filter(c => c.type === type);
+    
+    // Adiciona as opções ao select
+    filteredCategories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        selector.appendChild(option);
+    });
+}
+
         function openBudgetModal() {
             const container = document.getElementById('budgetInputsContainer');
             container.innerHTML = '';
