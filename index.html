@@ -450,7 +450,6 @@
         </div>
     </div>
 
-    <script>
   <script>
         // Chave de salvamento única local para iPhone (Fallback)
         const STORAGE_KEY = 'financas_pro_db_v5_clean';
@@ -498,19 +497,19 @@
             };
             saveDatabase();
         }
-
-        async function saveDatabase() {
-            // 1. Salva no LocalStorage para redundância e performance offline
+      
+async function saveDatabase() {
+            // Salva no LocalStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(window.appState));
 
-            // 2. Envia para o Firestore usando o despachante global configurado no módulo
-            try {
-                if (window.firebaseSaveFn) {
+            // Salva na nuvem apenas se o estado existir
+            if (window.firebaseSaveFn && window.appState) {
+                try {
                     await window.firebaseSaveFn(window.appState);
                     console.log("Dados salvos na nuvem com sucesso!");
+                } catch (e) {
+                    console.error("Erro ao salvar no Firebase:", e);
                 }
-            } catch (e) {
-                console.error("Erro ao salvar no Firebase:", e);
             }
         }
 
